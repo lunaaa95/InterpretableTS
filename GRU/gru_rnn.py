@@ -12,7 +12,7 @@ random.seed(1223)
 torch.manual_seed(1223)
 
 
-epoch = 300
+epoch = 100
 feature_num = 4
 batch_size = 32
 
@@ -133,9 +133,12 @@ if __name__ == "__main__":
         best_epoch_test_acc = 0
         best_model_file = None
         
-        for i in range(epoch):
+        for i in tqdm(range(epoch)):
             train_loss = train(model, train_x, train_y)
-            train_auc, train_acc = evaluate(model, train_x, train_y)
+            
+            train_auc = 0
+            train_acc = 0
+            # train_auc, train_acc = evaluate(model, train_x, train_y)
             eval_auc, eval_acc = evaluate(model, eval_x, eval_y)
             test_auc, test_acc = evaluate(model, test_x, test_y)
             # train_auc, train_acc = evaluate(model, train_x, train_y, True, './preds/train_preds.pkl')
