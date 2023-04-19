@@ -7,19 +7,20 @@ import math
 from tqdm import tqdm
 import os
 import random
+from sklearn import preprocessing
 
 random.seed(1223)
 torch.manual_seed(1223)
 
 
-epoch = 100
+epoch = 500
 feature_num = 4
 batch_size = 32
 
 class GRU_model(nn.Module):
-    def __init__(self, input_size=feature_num, hid_size=16):
+    def __init__(self, input_size=feature_num, hid_size=32, num_layers=1):
         super(GRU_model, self).__init__()
-        self.gru_layer = nn.GRU(input_size=input_size, hidden_size=hid_size, batch_first=True)
+        self.gru_layer = nn.GRU(input_size=input_size, hidden_size=hid_size, batch_first=True, num_layers= num_layers)
         self.linear = nn.Sequential(nn.Linear(hid_size, 1), nn.Sigmoid())
     
     def forward(self, x):
@@ -81,7 +82,7 @@ def evaluate_1(model, x_eval, y_eval, save=False, url=None):
         outputs.append(output)
         true_num = temp1[output == y].sum()
         preds += x.shape[0]
-        trues +=true_num
+        trues += true_num
     outputs = torch.cat(outputs, dim=0)
     if save:
         to_pickle(url, outputs.cpu().numpy())
@@ -109,18 +110,26 @@ if __name__ == "__main__":
     #     DEVICE = "cuda:0"\
     print('load data')
     # 读取数据
-    train_x = torch.from_numpy(np.array(read_pickle('data/train.pkl')).astype('float'))
-    train_y = torch.from_numpy(np.array(read_pickle('data/train_label.pkl')).astype('float'))
-    eval_x = torch.from_numpy(np.array(read_pickle('data/valid.pkl')).astype('float'))
-    eval_y = torch.from_numpy(np.array(read_pickle('data/valid_label.pkl')).astype('float'))
-    test_x = torch.from_numpy(np.array(read_pickle('data/test.pkl')).astype('float'))
-    test_y = torch.from_numpy(np.array(read_pickle('data/test_label.pkl')).astype('float'))
-
+    train_x = np.array(read_pickle('../data/stock100_teacher/train.pkl'))
+    train_y = torch.from_numpy(np.array(read_pickle('../data/stock100_teacher/train_label.pkl')).astype('float'))
+    eval_x = np.array(read_pickle('../data/stock100_teacher/valid.pkl'))
+    eval_y = torch.from_numpy(np.array(read_pickle('../data/stock100_teacher/valid_label.pkl')).astype('float'))
+    test_x = np.array(read_pickle('../data/stock100_teacher/test.pkl'))
+    test_y = torch.from_numpy(np.array(read_pickle('../data/stock100_teacher/test_label.pkl')).astype('float'))
+    
+    # 归一化
+    train_x = torch.from_numpy(preprocessing.scale(train_x.reshape((-1, 4))).reshape((-1, 30, 4)))
+    eval_x = torch.from_numpy(preprocessing.scale(eval_x.reshape((-1, 4))).reshape((-1, 30, 4)))
+    test_x = torch.from_numpy(preprocessing.scale(test_x.reshape((-1, 4))).reshape((-1, 30, 4)))
+    
+    train_x = train_x.to(torch.float)
+    eval_x = eval_x.to(torch.float)
+    test_x = test_x.to(torch.float)
     print(train_x.shape, train_y.shape)
     
     model = GRU_model()
     model = model.to(device=DEVICE)
-    model = model.to(torch.double)
+    model = model.to(torch.float)
     evaluate = evaluate_1
     task = 1
     clip = 0.25
@@ -141,13 +150,9 @@ if __name__ == "__main__":
             # train_auc, train_acc = evaluate(model, train_x, train_y)
             eval_auc, eval_acc = evaluate(model, eval_x, eval_y)
             test_auc, test_acc = evaluate(model, test_x, test_y)
-            # train_auc, train_acc = evaluate(model, train_x, train_y, True, './preds/train_preds.pkl')
-            # eval_auc, eval_acc = evaluate(model, eval_x, eval_y, True, './preds/valid_preds.pkl')
-            # test_auc, test_acc = evaluate(model, test_x, test_y, True, './preds/test_preds.pkl')
-            # exit
             
             if eval_auc > best_eval_auc:
-                eval_epoch_best = eval_auc
+                best_eval_auc = eval_auc
                 eval_best_str = "epoch{}, train_loss{:.4f}, eval_auc{:.4f}, eval_acc{:.4f}, test_auc{:.4f},test_acc{:.4f}".format(i, train_loss, eval_auc,eval_acc, test_auc, test_acc)
                 wait_epoch = 0
                 best_epoch = i
@@ -159,7 +164,7 @@ if __name__ == "__main__":
                 wait_epoch += 1
 
             if wait_epoch > 50:
-                print("saved_model_result:",eval_best_str)
+                print("saved_model_result:", eval_best_str)
                 break
             i += 1
             eval_str = "epoch{}, train_loss{:.4f}, train_auc{:.4f}, train_acc{:.4f}, eval_auc{:.4f}, eval_acc{:.4f}, test_auc{:.4f},test_acc{:.4f}".format(i, train_loss, train_auc, train_acc, eval_auc, eval_acc, test_auc, test_acc)
@@ -169,7 +174,7 @@ if __name__ == "__main__":
         print("the best epoch is {0}: best_eval_auc: {1}, best_eval_acc: {2}, test_acc: {3}".format(best_epoch , best_eval_auc, best_acc, best_epoch_test_acc))
         
         # 导出文件
-        train_auc, train_acc = evaluate(model, train_x, train_y, True, './preds/train')
-        eval_auc, eval_acc = evaluate(model, eval_x, eval_y, True, './preds/valid')
-        test_auc, test_acc = evaluate(model, test_x, test_y, True, './preds/test')
+        train_auc, train_acc = evaluate(model, train_x, train_y, True, './preds/train_pred.pkl')
+        eval_auc, eval_acc = evaluate(model, eval_x, eval_y, True, './preds/valid_pred.pkl')
+        test_auc, test_acc = evaluate(model, test_x, test_y, True, './preds/test_pred.pkl')
 

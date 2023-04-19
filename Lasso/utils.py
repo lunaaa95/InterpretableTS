@@ -57,7 +57,11 @@ def metrics_classify(y_pred, y_true):
                 true_count += 1
     fidelity = true_count / (sz * (sz - 1))
     
-    # auc
+    return fidelity
+
+def eval(y_pred, y_true):
+    y_pred = np.round(y_pred)
+    y_true = y_true.numpy()
     acc = (sum(y_pred == y_true) / len(y_true)).item()
     auc = roc_auc_score(y_true, y_pred)
-    return fidelity, auc, acc
+    return acc, auc
